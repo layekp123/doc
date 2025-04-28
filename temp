@@ -1,0 +1,191 @@
+import asyncio
+import logging
+from typing import Annotated
+from semantic_kernel import Kernel
+from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
+from semantic_kernel.agents import ChatCompletionAgent
+from semantic_kernel.functions import kernel_function
+import openai
+import base64
+from io import BytesIO
+from PIL import Image
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# Plugin for brand guidelines enforcement
+class BrandPlugin:
+    @kernel_function(description="Ensures content aligns with brand guidelines.")
+    def enforce_guidelines(
+        self, content: Annotated[str, "The content to check"], guidelines: Annotated[str, "Brand guidelines"]
+    ) -> Annotated[str, "Aligned content"]:
+        return f"{content}\n[Aligned with guidelines: {guidelines}]"
+
+# Plugin for audience targeting
+class AudiencePlugin:
+    @kernel_function(description="Tailors content for the target audience.")
+    def tailor_content(
+        self, content: Annotated[str, "The content to tailor"], audience: Annotated[str, "Target audience"]
+    ) -> Annotated[str, "Tailored content"]:
+        return f"{content}\n[Tailored for: {audience}]"
+
+# Plugin for social media optimization
+class SocialMediaPlugin:
+    @kernel_function(description="Adapts content for the specified social media platform with hashtags.")
+    def optimize_for_social(
+        self, content: Annotated[str, "The content to optimize"], platform: Annotated[str, "Target platform"]
+    ) -> Annotated[str, "Social media optimized content"]:
+        hashtags = self.generate_hashtags(content, platform)
+        optimized_content = self.optimize_content(content, platform)
+        return f"{optimized_content}\nHashtags: {hashtags} #SocialMediaReady"
+
+    def generate_hashtags(self, content: str, platform: str) -> str:
+        base_hashtags = ["Creativity", "Brand", "Engage"]
+        platform_specific = {
+            "Twitter": ["#XTrends", "#SocialMedia"],
+            "Facebook": ["#Community", "#Connect"],
+            "Instagram": ["#InstaVibes", "#VisualStory"]
+        }
+        hashtags = base_hashtags + platform_specific.get(platform, [])
+        return " ".join([f"#{kw}" for kw in hashtags])
+
+    def optimize_content(self, content: str, platform: str) -> str:
+        if platform == "Twitter":
+            return content[:250] + "..." if len(content) > 250 else content
+        elif platform == "Facebook":
+            return content[:450] + "..." if len(content) > 450 else content
+        elif platform == "Instagram":
+            return content[:900] + "..." if len(content) > 900 else content
+        return content
+
+# Function to generate image using Azure OpenAI DALL·E
+async def generate_image(prompt: str, api_key: str, endpoint: str) -> str:
+    try:
+        client = openai.AsyncOpenAI(
+            api_key=api_key,
+            base_url=endpoint
+        )
+        response = await client.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            size="1024x1024",
+            quality="standard",
+            n=1,
+            response_format="b64_json"
+        )
+        image_data = response.data[0].b64_json
+        return image_data
+    except Exception as e:
+        logger.error(f"Error generating image: {str(e)}")
+        return None
+
+async def create_multi_agent_system(inputs: dict) -> dict:
+    # Initialize kernel
+    kernel = Kernel()
+    kernel.add_service(
+        AzureChatCompletion(
+            deployment_name="your-deployment-name",
+            endpoint="your-endpoint",
+            api_key="your-api-key"
+        )
+    )
+
+    # Define agents
+    planner_agent = ChatCompletionAgent(
+        service=kernel.services["azure_chat_completion"],
+        name="PlannerAgent",
+        instructions="You are a strategic planner. Create a content plan based on campaign goals, key message, and USP.",
+        plugins=[],
+        arguments={}
+    )
+
+    content_creator_agent = ChatCompletionAgent(
+        service=kernel.services["azure_chat_completion"],
+        name="ContentCreatorAgent",
+        instructions="You are a creative writer. Generate engaging content based on the planner's strategy, key message, and USP.",
+        plugins=[AudiencePlugin()],
+        arguments={}
+    )
+
+    editor_agent = ChatCompletionAgent(
+        service=kernel.services["azure_chat_completion"],
+        name="EditorAgent",
+        instructions="You are an editor. Refine content to ensure it aligns with brand guidelines and is polished.",
+        plugins=[BrandPlugin()],
+        arguments={}
+    )
+
+    social_media_agent = ChatCompletionAgent(
+        service=kernel.services["azure_chat_completion"],
+        name="SocialMediaAgent",
+        instructions="You are a social media expert. Optimize content for the specified social media platform, making it concise, engaging, and adding platform-specific hashtags.",
+        plugins=[SocialMediaPlugin()],
+        arguments={}
+    )
+
+    # Hierarchical orchestration
+    try:
+        # Step 1: Planner creates strategy
+        planner_prompt = f"""
+        Campaign Goals: {inputs['campaign_goals']}
+        Key Message/USP: {inputs['key_message']}
+        Create a content strategy.
+        """
+        planner_response = await planner_agent.invoke_async(planner_prompt)
+        strategy = planner_response.message.content
+        logger.debug(f"Planner Strategy: {strategy}")
+
+        # Step 2: Content Creator generates content
+        creator_prompt = f"""
+        Strategy: {strategy}
+        Key Message/USP: {inputs['key_message']}
+        Target Audience: {inputs['target_audience']}
+        Generate creative content.
+        """
+        creator_response = await content_creator_agent.invoke_async(creator_prompt)
+        draft_content = creator_response.message.content
+        logger.debug(f"Draft Content: {draft_content}")
+
+        # Step 3: Editor refines content
+        editor_prompt = f"""
+        Draft Content: {draft_content}
+        Brand Guidelines: {inputs['brand_guidelines']}
+        Refine and align content.
+        """
+        editor_response = await editor_agent.invoke_async(editor_prompt)
+        edited_content = editor_response.message.content
+        logger.debug(f"Edited Content: {edited_content}")
+
+        # Step 4: Social Media Agent optimizes content
+        social_prompt = f"""
+        Edited Content: {edited_content}
+        Target Audience: {inputs['target_audience']}
+        Social Media Platform: {inputs['social_media_platform']}
+        Optimize for the specified platform.
+        """
+        social_response = await social_media_agent.invoke_async(social_prompt)
+        final_content = social_response.message.content
+        logger.debug(f"Social Media Content: {final_content}")
+
+        # Step 5: Generate image with DALL·E
+        image_prompt = f"""
+        Create a vibrant image representing the key message: {inputs['key_message']}.
+        Align with brand guidelines: {inputs['brand_guidelines']}.
+        Suitable for {inputs['social_media_platform']}.
+        """
+        image_data = await generate_image(
+            prompt=image_prompt,
+            api_key="your-api-key",
+            endpoint="your-endpoint"
+        )
+
+        return {
+            "strategy": strategy,
+            "content": final_content,
+            "image": image_data
+        }
+
+    except Exception as e:
+        logger.error(f"Error in multi-agent system: {str(e)}")
+        return {"strategy": "", "content": f"Error generating content: {str(e)}", "image": None}
