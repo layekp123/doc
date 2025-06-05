@@ -1,0 +1,36 @@
+Evolving Knowledge Retrieval with Azure AI Search: Next-Gen RAG for Enterprise Agents
+This presentation outlines how Azure AI Search is transforming knowledge retrieval, moving from basic Retrieval Augmented Generation (RAG) to purpose-built, sophisticated systems that address complex real-world challenges in enterprise AI solutions.
+Key Concepts:
+•
+1. Agentic Retrieval: Elevating the Query Pipeline for Complex Questions
+◦
+Problem: Traditional RAG often struggles with complex, multi-part, or conversational queries that single-shot search (top-K results) cannot effectively answer.
+◦
+Solution: Agentic retrieval applies agentic methods within the search engine itself. It performs query planning using an internal language model to understand information needs, decompose queries, correct typos, and paraphrase for better recall.
+◦
+Process: It executes multiple queries in parallel as needed (e.g., for different parts of a complex question) and then merges the results into a single, comprehensive response for the LLM.
+◦
+Impact: This significantly improves performance for difficult questions, showing a 40% increase in answer relevance and a 30% increase in result rate for complex queries in evaluations. It introduces a knowledge agent as a first-class construct, abstracting away low-level search details.
+•
+2. Evolved Data Ingestion: Handling Real-World, Multi-Modal Content
+◦
+Challenge: Real-world enterprise data is often complex, multi-modal (text, images, diagrams, layout information), and not simply "500-token chunks".
+◦
+Solution: Azure AI Search now offers advanced capabilities for RAG-specific data ingestion. This includes:
+▪
+Multi-modal support: Automatically extracting layout information, handling images, and making individual components addressable for richer application experiences.
+▪
+Image Verbalization: Using OpenAI GPT models during ingestion to describe images as text, which can be more effective for retrieval than image embeddings in certain nuanced scenarios.
+▪
+Seamless Integration: Simplifies connecting to various data sources within Azure (Blob Storage, OneLake, SQL, Cosmos DB) and external sources via Logic Apps, automating data preparation, chunking, and vectorization.
+•
+3. Enterprise-Grade Security: Robust Access Control for AI Systems
+◦
+Critical Need: As AI systems find "everything," ensuring proper access control across the entire data stack is paramount; users should only see information they are authorized to access.
+◦
+Solution: Native support for Entra-based document access control. This allows propagating permissions (user IDs, groups, RBAC roles) from source data directly into the search index.
+◦
+Benefit: The system automatically handles group expansions and applies filters at query time, making the index appear as if only accessible documents are present, greatly simplifying security management and reducing error-proneness.
+◦
+Advanced Security: Introducing (in private preview) support for Microsoft Purview document sensitivity labels, allowing organizations to enforce security policies and handle encrypted documents end-to-end based on their classification.
+Overall Goal: The shift is from using existing tools to purpose-built systems that make it easier and faster for developers to build higher-quality, more grounded, and secure AI applications that solve real-world problems
