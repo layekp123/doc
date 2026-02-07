@@ -1,0 +1,27 @@
+Dynamic Few-Shot Retrieval
+
+
+Stream A: Source Discovery (The "What")
+Process: Standard RAG retrieves the raw financial table from the 200-page PDF.
+Key Tech: Vector similarity (e.g., "Find the Balance Sheet chunk").
+Stream B: Logic Discovery (The "How")
+Process: Metadata-filtered retrieval from the Golden Dataset.
+Filter Logic: WHERE Industry = 'SaaS' AND Standard = 'IFRS'.
+The Merge: The Augmented Prompt
+The LLM receives:
+Instruction: "Extract Total Current Assets."
+Context: The raw PDF snippet found in Stream A.
+Few-Shot Examples: 2 similar extractions found in Stream B.
+The "Guardrail" Layer:
+The model performs a Self-Consistency Check: It compares the retrieved example's unit scale (e.g., billions) against the source text to ensure it doesn't carry over the wrong magnitude.
+
+
+"The Company recorded Deferred Revenue of $50.0M related to multi-year software subscriptions. Of this, $30.0M is expected to be recognized within the next 12 months."
+
+The Output: {"total_current_liabilities": 0} or {"revenue": 50000000}.
+Why it failed: The model used its general training, which often associates "Revenue" with "Earnings," not "Debt/Liability."
+
+Metadata: {Industry: SaaS, Section: Balance Sheet}
+Example Input: "Unearned subscription fees: $10M total, $4M current."
+Example Logic: In SaaS, "Unearned" or "Deferred" revenue is a Liability. Only the portion recognized within 12 months is Current.
+Example Output: {"total_current_liabilities": 4000000}
